@@ -1,0 +1,39 @@
+services:
+
+  # ── Servicio 1: MongoDB corriendo como contenedor local ──────────────────────
+  mongodb:
+    image: mongo:noble                    # imagen oficial de MongoDB versión 7
+    container_name: leidy-mongodb
+    ports:
+      - "27017:27017"                 # expone el puerto al host (útil para conectar con Compass)
+    volumes:
+      - mongo_data:/data/db           # los datos persisten aunque el contenedor se detenga
+    healthcheck:                      # Docker espera que mongo esté listo antes de arrancar la app
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Servicio 2: La app Streamlit ─────────────────────────────────────────────
+  app:
+    build: .
+    container_name: leidy-mongo-crud
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env                          # carga MONGO_URI_ATLAS desde el archivo .env
+    environment:
+      # Dentro de Docker, los contenedores se hablan por nombre de servicio.
+      # "mongodb" aquí es el nombre del servicio de arriba, no "localhost".
+      MONGO_URI_LOCAL: mongodb://mongodb:27017
+    depends_on:
+      mongodb:
+        condition: service_healthy    # espera el healthcheck antes de arrancar
+    restart: unless-stopped
+
+# ── Volumen nombrado para persistencia de datos ──────────────────────────────
+volumes:
+  mongo_data:
+    # Docker gestiona este volumen en su propio almacenamiento.
+    # Los datos sobreviven a: docker compose down
+    # Los datos se borran con: docker compose down -v
